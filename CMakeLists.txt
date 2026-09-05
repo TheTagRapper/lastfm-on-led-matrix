@@ -13,6 +13,8 @@ pico_sdk_init()
 add_executable(build_main
 	main.c
 	cJSON.c
+	json-parser.h
+	lwip-callbacks.h
 )
 
 pico_enable_stdio_usb(build_main 1)
