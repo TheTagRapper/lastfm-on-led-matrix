@@ -1,4 +1,8 @@
 #include <stdio.h>
+#define STDIO_INCLUDE
+
+#define IS_MAIN
+
 #include <string.h>
 #include <stdlib.h>
 #include "pico/stdlib.h"
@@ -13,6 +17,13 @@ ip_addr_t true_ip;
 bool done = false;
 bool success = false;
 
+struct track_metadata {
+	char track_name[255];
+	char artist_name[255];
+	bool is_playing;
+};
+
+struct track_metadata track_data;
 
 int main(void)
 {
