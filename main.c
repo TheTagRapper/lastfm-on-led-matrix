@@ -13,17 +13,17 @@
 #include "json-parser.h"
 #include "lwip-callbacks.h"
 
+
+#ifndef SHARED_STRUCTS
+#define SHARED_STRUCTS
+#include "shared-structs.h"
+#endif
+
 ip_addr_t true_ip;
 bool done = false;
 bool success = false;
 
-struct track_metadata {
-	char track_name[255];
-	char artist_name[255];
-	bool is_playing;
-};
 
-struct track_metadata track_data;
 
 int main(void)
 {
@@ -62,8 +62,13 @@ int main(void)
 		if (success)
 		{
 			printf("Resolved to: %s\n", ipaddr_ntoa(&true_ip));
+
+			// Initalise struct for metadata
+			struct track_metadata* track_data = malloc(255 * sizeof(char) + 255 * sizeof(char) + sizeof(bool));
+			
+
 			// No Certificate
-			TLS_CLIENT_T* state = tls_client_setup();
+			TLS_CLIENT_T* state = tls_client_setup(track_data);
 			
 			while (!state->complete)
 			{
@@ -72,6 +77,7 @@ int main(void)
 
 			}
 
+			free(track_data);
 		
 		}
 	

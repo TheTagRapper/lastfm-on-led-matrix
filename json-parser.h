@@ -9,17 +9,17 @@
 #endif 
 
 #ifndef LAST_FM_MSG_SIZE
-#define LAST_FM_MSG_SIZE 3*1500*sizeof(char)
+#define LAST_FM_MSG_SIZE 3*1500
 #endif
 
-char json_string[];
-char full_packet[];
+#ifndef STRUCTS_INCLUDED
+#include "shared-structs.h"
+#define STRUCTS_INCLUDED
+#endif
 
-struct track_metadata track_data;
-
-size_t parse_json_buffer(char *buffer, size_t itemsize, size_t no_of_items, void* ignorethis)
+int parse_json_buffer(char *buffer, struct track_metadata* track_data)
 {
-	size_t bytes = itemsize * no_of_items;
+
 	char *track_name;
 	char *artist_name;
 	
@@ -56,6 +56,27 @@ size_t parse_json_buffer(char *buffer, size_t itemsize, size_t no_of_items, void
 	if (index == NULL)
 	{
 		printf("0 doesnt exist");
+		return -1;
+	}
+
+	cJSON *image_array = cJSON_GetObjectItemCaseSensitive(index, "image");
+	if (image_array == NULL)
+	{
+		printf("Images don't exist");
+		return -1;
+	}
+
+	cJSON *image_small_data = cJSON_GetArrayItem(image_array, 0);
+	if (image_small_data == NULL)
+	{
+		printf("small image doesn't exist");
+		return -1;
+	}
+
+	cJSON *image_small_link = cJSON_GetObjectItemCaseSensitive(image_small_data, "#text");
+	if (image_small_link == NULL)
+	{
+		printf("Link for small image doesn't exist");
 		return -1;
 	}
 
@@ -96,25 +117,28 @@ size_t parse_json_buffer(char *buffer, size_t itemsize, size_t no_of_items, void
 		cJSON_Delete(json);
 	}
 
-	track_data->track_name = track_name;
-	track_data->artist_name = artist_name;
+	strcpy(track_data->track_name, track_name);
+	strcpy(track_data->artist_name, artist_name);
 	track_data->is_playing = now_playing;
 	
 	if (now_playing)
 	{
-		printf("Now Playing: %s by %s", track_name, artist_name);
+		printf("Now Playing: %s by %s\n", track_name, artist_name);
 
 	} else
 	{
-		printf("Last Played Track: %s by %s", track_name, artist_name);
+		printf("Last Played Track: %s by %s\n", track_name, artist_name);
 	}
 
-	cJSON_Delete(json);
-	return bytes;
+	printf("Small Image Link Is: %s", image_small_link->valuestring);
 
+	//
+
+	cJSON_Delete(json);
+	
 }
 
-void http_to_json(char[] )
+void http_to_json(char* full_packet, char* json_string, int string_size)
 {
 	// full_packet and json_string are extern variables
 	// full_packet stitched in lwip-callbacks
@@ -124,7 +148,7 @@ void http_to_json(char[] )
 	int json_index = 0;
 	//printf("\nNow Trying to Find JSON string\n");
 	bool json_started = false;
-					
+			
 	for (int i = 0; i < size_message; i++)
 	{
 		char starter_char = '{';
@@ -141,11 +165,7 @@ void http_to_json(char[] )
 		
 	}
 
-	printf("Now Parsing JSON STRING : \n %s \n", json_string);
+	printf("Now Parsing JSON STRING : \n %s \n", json_string);	
 
-	parse_json_buffer(json_string, sizeof(char), strlen(json_string), NULL);
-	
-	// Reset Static Strings
-	full_packet[0] = '\0';
-	json_string[0] = '\0';
 }
+
