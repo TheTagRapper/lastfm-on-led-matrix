@@ -22,6 +22,7 @@ int parse_json_buffer(char *buffer, struct track_metadata* track_data)
 
 	char *track_name;
 	char *artist_name;
+	char *image_link;
 	
 	// Parsing JSON
 	cJSON *json = cJSON_Parse(buffer);
@@ -113,12 +114,22 @@ int parse_json_buffer(char *buffer, struct track_metadata* track_data)
 	} 
 	else 
 	{
-		printf("FAILURE? \n");
+		printf("Track Name has not been found\n");
 		cJSON_Delete(json);
+	}
+
+	if (cJSON_IsString(image_link) && image_small_link->valuestring != NULL)
+	{
+		image_link = image_small_link->valuestring;
+	}
+	else
+	{
+		printf("Small Image Link not found \n");
 	}
 
 	strcpy(track_data->track_name, track_name);
 	strcpy(track_data->artist_name, artist_name);
+	strcpy(track_data->image_link, image_link);	
 	track_data->is_playing = now_playing;
 	
 	if (now_playing)
@@ -130,7 +141,7 @@ int parse_json_buffer(char *buffer, struct track_metadata* track_data)
 		printf("Last Played Track: %s by %s\n", track_name, artist_name);
 	}
 
-	printf("Small Image Link Is: %s", image_small_link->valuestring);
+	printf("Small Image Link Is: %s", image_link);
 
 	//
 
@@ -168,4 +179,47 @@ void http_to_json(char* full_packet, char* json_string, int string_size)
 	printf("Now Parsing JSON STRING : \n %s \n", json_string);	
 
 }
+
+void image_link_to_request(char *image_link, char *request, int link_length, int request_length)
+{
+	// https:\/\/lastfm-img.freetls.fastly.net\/i\/u\/34s\/918b8de2341bd849b6c9e54a107380b6.jpg
+	// Hostname : lastfm-img.freetls.fastly.net
+	// i/u/34s
+
+	bool start_copying = false;
+	bool end_of_string = false;
+	
+	// will stop three characters after a dot
+	// This stopping conditioner only triggers after start_copying is true
+
+	int image_link_index = 0;
+	int image_name_index = 0;
+
+	char buff_b4_link[3] = "___";
+	char image_name[35];
+	
+	while (image_link_index < link_length-1 && !end_of_string)
+	{
+		buff_b4_link[0] = buff_b4_link[1];
+		buff_b4_link[1] = buff_b4_link[2];
+		buff_b4_link[2] = dirty_link[index]
+
+		// Check until we know we have reached the image name
+		// Everything before is the same
+		if (strcmp(buff_b4_link, "4s/")) start_copying = true;
+
+		if (start_copying && image_name_index++)
+		{
+			if (buff_b4_link != "jpg" && buff_b4_link != "png") image_name[image_name_index++] = image_link[image_link_index]; 
+			else end_of_string = true;
+		}
+		
+		index++;		
+	}
+
+	// Check if condition has been reached
+	 snprintf(request, request_length ,"GET /i/u/34s/%s HTTP/1.1\r\nHost: lastfm-img.freetls.fastly.net\r\nConnection: close\r\n\r\n");
+
+}
+
 
