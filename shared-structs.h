@@ -1,5 +1,6 @@
 #ifndef IS_MAIN
 #include <stdbool.h>
+#include <stdlib.h>
 #endif
 
 #ifndef SHARED_STRUCTS
@@ -8,6 +9,8 @@
 struct track_metadata {
 	char track_name[255];
 	char artist_name[255];
+	char image_link[255];
+	char image_request[300 * sizeof(char)];
 	bool is_playing;
 };
 

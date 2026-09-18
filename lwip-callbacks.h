@@ -5,42 +5,46 @@
 #include "lwip/altcp_tls.h"
 #include "mbedtls/ssl.h"
 
-char full_packet[2*1500*sizeof(char)] = "";
-char json_string[2*1500*sizeof(char)] = "";
+#ifndef STRUCTS_INCLUDED
+#include "shared-structs.h"
+#define STRUCTS_INCLUDED
+#endif
+
+#define LAST_FM_MSG_SIZE 3*1500
+
+static char *full_packet;
+static char *json_string;
 
 extern bool done;
 extern bool success;
-extern ip_addr_t true_ip;
-
-
-typedef struct TLS_CLIENT_T {
-	struct altcp_pcb *pcb;
-	bool connected;
-	bool complete;
-	int error;
-	const char *http_request;
-	int timeout;
-} TLS_CLIENT_T;
+extern ip_addr_t metadata_ip;
+extern ip_addr_t image_ip;
 
 static struct altcp_tls_config *tls_config = NULL;
 
 static err_t tls_client_close(void *arg) {
+
 	TLS_CLIENT_T *state = (TLS_CLIENT_T*)arg;
 	err_t err = ERR_OK;
 
+	// CLIENT_T will now end
 	state->complete = true;
+	
 	if (state->pcb != NULL)
 	{
+		// Resetting PCB
 		altcp_arg(state->pcb, NULL);
         altcp_poll(state->pcb, NULL, 0);
         altcp_recv(state->pcb, NULL);
         altcp_err(state->pcb, NULL);
         err = altcp_close(state->pcb);
+
         if (err != ERR_OK) {
             printf("close failed %d, calling abort\n", err);
             altcp_abort(state->pcb);
             err = ERR_ABRT;
         }
+
         state->pcb = NULL;
     }
     return err;
@@ -49,6 +53,7 @@ static err_t tls_client_close(void *arg) {
 static err_t tls_client_connected(void *arg, struct altcp_pcb *pcb, err_t err)
 {
 	TLS_CLIENT_T *state = (TLS_CLIENT_T*)arg;
+
 	if (err != ERR_OK) {
 		printf("Connection Failed %d\n", err);
 		return tls_client_close(state);
@@ -56,17 +61,18 @@ static err_t tls_client_connected(void *arg, struct altcp_pcb *pcb, err_t err)
 
 	printf("Connected to Server\n");
 	state->connected = true;
-	
+
+	// Enqueueing Request
 	err = altcp_write(state->pcb, state->http_request, strlen(state->http_request), TCP_WRITE_FLAG_COPY);
 	if (err != ERR_OK)
 	{
 		printf("error writing data, err=%d", err);
 		return tls_client_close(state);
 	}
-	printf("Enqueued Request");
+	printf("Enqueued Request\n");
 	//printf(": %s\n", state->http_request);
 
-	
+	// Sending Request
 	err = altcp_output(state->pcb);
 	if (err != ERR_OK)
 	{
@@ -88,7 +94,16 @@ void my_dns_found_callback(const char *name, const ip_addr_t *ipaddr, void *arg)
 		return ;
 	}
 
-	true_ip = *ipaddr;
+	if (ip_addr_isany(&metadata_ip))
+	{
+		metadata_ip = *ipaddr;
+		ip_addr_set_zero(&image_ip);
+	} else
+	{
+		ip_addr_set_zero(&metadata_ip);
+		image_ip = *ipaddr;
+	}
+
 	done = true;
 	success = true;	
 }
@@ -130,41 +145,28 @@ static err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, e
 	if (!p)
 	{
 		printf("\nConnection Closed\n");
-		//printf("Whole Message: \n %s \n \n", full_packet);
+		printf("Whole Message: \n %s \n \n", full_packet);
 
-		int size_message = strlen(full_packet);
-		int json_index = 0;
-		if (size_message > 0)
+		if (state->track_data->image_link[0] == 0)
 		{
-			//printf("\nNow Trying to Find JSON string\n");
-			bool json_started = false;
-							
-			for (int i = 0; i < size_message; i++)
-			{
-				char starter_char = '{';
-				//printf("%c", full_packet[i]);
-				if (!json_started && full_packet[i] == '{')
-				{
-					json_started = true;
-					json_string[json_index++] = full_packet[i];
-				}
-				else if (json_started)
-				{
-					json_string[json_index++] = full_packet[i];
-				}
-				
-			}
+			if (strlen(full_packet) > 0) http_to_json(full_packet, json_string, LAST_FM_MSG_SIZE);
+			full_packet[0] = 0;
 
-			printf("Now Parsing JSON STRING : \n %s \n", json_string);
+			parse_json_buffer(json_string, state->track_data);
+			json_string[0] = 0;
 
-			parse_json_buffer(json_string, sizeof(char), strlen(json_string), NULL);
+			char* image_request = calloc(150, sizeof(char));
 			
-			// Reset Static Strings
-			full_packet[0] = '\0';
-			json_string[0] = '\0';
+			image_link_to_request(state->track_data->image_link, image_request, 200, 300);
+			printf("Image is now turned to request: %s\n", image_request);
+			strcpy(state->track_data->image_request, image_request);
+			free(image_request);
+		} else
+		{
+			printf("\nImage Received:\n%s", state->track_data->image_link);
+			full_packet[0] = 0;
 		}
-		
-		
+			
 		return tls_client_close(state);
 	}
 
@@ -181,8 +183,7 @@ static err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, e
 		//printf("\nNew Packet Received\n %s, \n ", buf);
 
 		//Concatenate into one string
-		if (strlen(full_packet) == 0) strcat(full_packet, buf);
-		else strcat(full_packet, buf);
+		strcat(full_packet, buf);
 		//printf("CONCATENATION OCCURRED\n");
 		
 		// Confirms we have processed the data
@@ -199,9 +200,23 @@ void fail_state()
 	while (1) sleep_ms(1000);
 }
 
-static TLS_CLIENT_T* tls_client_setup()
+static TLS_CLIENT_T* tls_client_setup(struct track_metadata* track_data, void *request_link_arg)
 {
 	struct altcp_tls_config *tls_config = altcp_tls_create_config_client(NULL, 0);
+
+	full_packet = (char *)calloc(LAST_FM_MSG_SIZE, sizeof(char));
+	json_string = (char *)calloc(LAST_FM_MSG_SIZE, sizeof(char));
+
+	char *request_link;
+	printf("\nrequest_link_arg : %s", request_link_arg);
+	if (request_link_arg == NULL)
+	{
+		request_link = LASTFM_HTTP_REQUEST;
+	}
+	else
+	{
+		request_link = (char *)request_link_arg;
+	}
 	
 	TLS_CLIENT_T *state = tls_client_init();
 	if (!state)
@@ -209,18 +224,40 @@ static TLS_CLIENT_T* tls_client_setup()
 		printf("failed to assign state");
 		fail_state();
 	}
+	
 	state->pcb = altcp_tls_new(tls_config, IPADDR_TYPE_ANY);
 	if (!state->pcb) { printf("failed to create pcb\n"); return NULL; }
 
-	state->http_request = LASTFM_HTTP_REQUEST;
+	state->http_request = request_link;
 	state->timeout = 15;
+	state->track_data = track_data;
 
+
+	char *domain;
+	if (request_link_arg)
+	{
+		domain = "lastfm.freetls.fastly.net";
+	}
+	else
+	{
+		domain = "ws.audioscrobbler.com";
+	}
+
+	printf("\n\nDomain: %s\n\n Request: %s\n", domain, state->http_request);
+	
 	altcp_arg(state->pcb, state);
 	altcp_recv(state->pcb, tls_client_recv);
 	altcp_err(state->pcb, tls_client_err);
 	altcp_poll(state->pcb, tls_client_poll, 5*2);
-	mbedtls_ssl_set_hostname(altcp_tls_context(state->pcb), "ws.audioscrobbler.com");
+	mbedtls_ssl_set_hostname(altcp_tls_context(state->pcb), domain);
 
-	altcp_connect(state->pcb, &true_ip, 443, tls_client_connected);
+	if (!request_link_arg)
+	{
+		altcp_connect(state->pcb, &metadata_ip, 443, tls_client_connected);
+	}
+	else
+	{
+		altcp_connect(state->pcb, &image_ip, 443, tls_client_connected);
+	}
 	return state;
 }

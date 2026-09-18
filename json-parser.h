@@ -118,7 +118,7 @@ int parse_json_buffer(char *buffer, struct track_metadata* track_data)
 		cJSON_Delete(json);
 	}
 
-	if (cJSON_IsString(image_link) && image_small_link->valuestring != NULL)
+	if (cJSON_IsString(image_small_link) && image_small_link->valuestring != NULL)
 	{
 		image_link = image_small_link->valuestring;
 	}
@@ -141,7 +141,7 @@ int parse_json_buffer(char *buffer, struct track_metadata* track_data)
 		printf("Last Played Track: %s by %s\n", track_name, artist_name);
 	}
 
-	printf("Small Image Link Is: %s", image_link);
+	printf("Small Image Link Is: %s\n", image_link);
 
 	//
 
@@ -176,7 +176,7 @@ void http_to_json(char* full_packet, char* json_string, int string_size)
 		
 	}
 
-	printf("Now Parsing JSON STRING : \n %s \n", json_string);	
+	printf("Now Parsing JSON STRING : \n %s ", json_string);	
 
 }
 
@@ -197,28 +197,37 @@ void image_link_to_request(char *image_link, char *request, int link_length, int
 
 	char buff_b4_link[3] = "___";
 	char image_name[35];
+
 	
 	while (image_link_index < link_length-1 && !end_of_string)
 	{
+		// For some reason accessing buffer as string messes it up
+		// Access each element individually
+		bool is_jpg = buff_b4_link[0] == 'j' && buff_b4_link[1] == 'p' && buff_b4_link[2] == 'g';
+		bool is_png = buff_b4_link[0] == 'p' && buff_b4_link[1] == 'n' && buff_b4_link[2] == 'g';
+		if (start_copying)
+		{
+			if (!is_jpg && !is_png) image_name[image_name_index++] = image_link[image_link_index]; 
+			else
+			{
+				end_of_string = true;
+				image_name[image_name_index] = '\0';	
+			} 
+		}
 		buff_b4_link[0] = buff_b4_link[1];
 		buff_b4_link[1] = buff_b4_link[2];
-		buff_b4_link[2] = dirty_link[index]
+		buff_b4_link[2] = image_link[image_link_index];
 
 		// Check until we know we have reached the image name
 		// Everything before is the same
-		if (strcmp(buff_b4_link, "4s/")) start_copying = true;
-
-		if (start_copying && image_name_index++)
-		{
-			if (buff_b4_link != "jpg" && buff_b4_link != "png") image_name[image_name_index++] = image_link[image_link_index]; 
-			else end_of_string = true;
-		}
+		if (buff_b4_link[0] == '4' && buff_b4_link[1] == 's' && buff_b4_link[2] == '/') {start_copying = true; printf("STARTED COPYING\n");}
 		
-		index++;		
+		image_link_index++;		
+		printf("\nBUFF AT END OF LOOP: %c | %c | %c \n", buff_b4_link[0], buff_b4_link[1], buff_b4_link[2]);
 	}
-
+	printf("Image name is : %s", image_name);
 	// Check if condition has been reached
-	 snprintf(request, request_length ,"GET /i/u/34s/%s HTTP/1.1\r\nHost: lastfm-img.freetls.fastly.net\r\nConnection: close\r\n\r\n");
+	 snprintf(request, request_length+200 ,"GET /i/u/34s/%s HTTP/1.1\r\nHost: lastfm.freetls.fastly.net\r\nConnection: close\r\n\r\n", image_name);
 
 }
 
