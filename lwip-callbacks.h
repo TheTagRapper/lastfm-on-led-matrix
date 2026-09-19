@@ -13,6 +13,7 @@
 #define LAST_FM_MSG_SIZE 3*1500
 
 static char *full_packet;
+int full_packet_length = 0;
 static char *json_string;
 
 extern bool done;
@@ -145,12 +146,13 @@ static err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, e
 	if (!p)
 	{
 		printf("\nConnection Closed\n");
-		printf("Whole Message: \n %s \n \n", full_packet);
+		//printf("Whole Message: \n %s \n \n", full_packet);
 
 		if (state->track_data->image_link[0] == 0)
 		{
 			if (strlen(full_packet) > 0) http_to_json(full_packet, json_string, LAST_FM_MSG_SIZE);
 			full_packet[0] = 0;
+			full_packet_length = 0;
 
 			parse_json_buffer(json_string, state->track_data);
 			json_string[0] = 0;
@@ -163,7 +165,21 @@ static err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, e
 			free(image_request);
 		} else
 		{
-			printf("\nImage Received:\n%s", state->track_data->image_link);
+			printf("\nImage Received:\n%s");
+
+			// Debugging full packet
+			// Cannot be interpreted as string as it contains 0x00 which null terminates
+			bool start_printing = false;
+			for (int i = 0;  i < full_packet_length; i++ )
+			{
+				if (full_packet[i] == 255) start_printing = true;
+				if (start_printing)
+				{
+					printf("%X", full_packet[i]);
+					if (i+1 % 2 == 0) printf(" ");
+					if (i+1 % 16 == 0) printf("\n");
+				}
+			}
 			full_packet[0] = 0;
 		}
 			
@@ -179,11 +195,20 @@ static err_t tls_client_recv(void *arg, struct altcp_pcb *pcb, struct pbuf *p, e
 
 		pbuf_copy_partial(p, buf, p->tot_len, 0);
 		buf[p->tot_len] = 0;
-
 		//printf("\nNew Packet Received\n %s, \n ", buf);
 
 		//Concatenate into one string
-		strcat(full_packet, buf);
+		// Can't use strcat as image contains null termination 0x00
+		for (int i =  0; i < p->tot_len; i++)
+		{
+			if (full_packet_length+i < LAST_FM_MSG_SIZE)
+			{
+				full_packet[full_packet_length + i] = buf[i];
+			}
+			// NEED TO RETURN ERROR IF TOO BIG
+		}
+		full_packet_length += p->tot_len;
+
 		//printf("CONCATENATION OCCURRED\n");
 		
 		// Confirms we have processed the data
