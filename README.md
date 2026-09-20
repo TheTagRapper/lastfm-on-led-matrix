@@ -25,8 +25,8 @@ Linear Progress:
 - [ ] Drive Buffer to LED Screen
 
 Touchup Progress:
-	- [ ] Retry Wifi Connection on Failure
-	- [ ] Automatic Repeated Requesting on Data
+- [ ] Retry Wifi Connection on Failure
+- [ ] Automatic Repeated Requesting on Data
 
 ## How to Build
 
