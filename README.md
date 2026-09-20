@@ -3,9 +3,9 @@
 This project retrieves whatever song is currently playing and it's cover art, using the LastFM API and drives it to a 64x64 LED Matrix display.
 
 This project is built using a Raspberry Pi Pico WH using the libraries:
-	- lwIP to handle HTTP Requests
-	- mbedtls in order to handle the TLS.
-	- cJSON to parse the JSON
+- lwIP to handle HTTP Requests
+- mbedtls in order to handle the TLS.
+- cJSON to parse the JSON
 
 
 ## Checklist
