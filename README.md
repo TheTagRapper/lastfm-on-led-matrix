@@ -13,16 +13,16 @@ This project is built using a Raspberry Pi Pico WH using the libraries:
 This checklist is not final as there are certain stages which I may have not reached yet that are actually more complex than they actually are
 
 Linear Progress:
-	- [x] Establish WiFi Connection
-	- [x] Build out lwIP callback functions
-	- [x] Successfully request LastFM API Track Data
-	- [x] Parse Track Data JSON 
-	- [x] Construct Request for Track Image
-	- [ ] Build PNG->PPM Decoder
-	- [ ] Build JPG->PPM Decoder
-	- [ ] Create 64x64 Frame Buffer
-	- [ ] Build Driver for HUB75
-	- [ ] Drive Buffer to LED Screen
+- [x] Establish WiFi Connection
+- [x] Build out lwIP callback functions
+- [x] Successfully request LastFM API Track Data
+- [x] Parse Track Data JSON 
+- [x] Construct Request for Track Image
+- [ ] Build PNG->PPM Decoder
+- [ ] Build JPG->PPM Decoder
+- [ ] Create 64x64 Frame Buffer
+- [ ] Build Driver for HUB75
+- [ ] Drive Buffer to LED Screen
 
 Touchup Progress:
 	- [ ] Retry Wifi Connection on Failure
